@@ -6,7 +6,7 @@ Uses 8 threads by default.
 
 ## Usage
 
-`cargo run <domain> <1-4 byte hex string> [--suffix]`
+`cargo run <domain> <1-4 byte hex pattern> [--suffix]`
 
 ## Example
 
