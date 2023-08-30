@@ -1,27 +1,34 @@
+use clap::{self, Parser};
 use hex::decode;
 use rand::Rng;
 use rayon::prelude::*;
-use std::env;
 use std::sync::{Arc, Mutex};
 use tiny_keccak::{Hasher, Keccak};
 
-fn main() {
-    // Get command line arguments
-    let args: Vec<String> = env::args().collect();
+#[derive(Parser)]
+struct Args {
+    ///Base domain
+    input: String,
+    ///Hex pattern to match
+    pattern: String,
 
-    // Check if an argument is provided
-    if args.len() != 3 {
-        eprintln!("Usage: {} <input_string> <hex prefix>", args[0]);
-        return;
-    }
+    ///Whether or not to match on prefix or suffix
+    #[arg(long, short, default_value_t = false)]
+    suffix: bool,
+}
+
+fn main() {
+    let args = Args::parse();
 
     // Get the input string from the command line
-    let input = &args[1];
+    let input = &args.input;
 
     // strip 0x from the hex prefix if it exists
-    let hex_arg = args[2].strip_prefix("0x").unwrap_or(&args[2]);
+    let hex_arg = args.pattern.strip_prefix("0x").unwrap_or(&args.pattern);
     // Decode the hex prefix
-    let prefix = decode(hex_arg).expect("Decoding failed");
+    let pattern = decode(hex_arg).expect("Decoding failed");
+
+    let suffix = args.suffix;
 
     // Number of batches to run in parallel
     let num_batches = 8;
@@ -48,8 +55,17 @@ fn main() {
             keccak.update(new_input.as_bytes());
             keccak.finalize(&mut output);
 
-            // Check if the first bytes of the hash match the prefix
-            let prefix_match = prefix.iter().enumerate().all(|(i, &x)| x == output[i]);
+            // Check if the bytes of the hash match the prefix
+            let prefix_match: bool;
+            if suffix {
+                prefix_match = pattern
+                    .iter()
+                    .rev()
+                    .zip(output.iter().rev())
+                    .all(|(x, y)| x == y);
+            } else {
+                prefix_match = pattern.iter().zip(output.iter()).all(|(x, y)| x == y);
+            }
 
             // get the lock on the shared variable now that work is done
             let mut _found = found.lock().unwrap();
